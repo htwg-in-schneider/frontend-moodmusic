@@ -1,17 +1,23 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
-import { getPlaylists, deletePlaylist as deletePlaylistApi } from '../services/playlistService.js'
+import { appStore } from '../store.js'
+import { getPlaylists, deletePlaylist as deletePlaylistApi, likePlaylist } from '../services/playlistService.js'
+import { getSongs } from '../services/songService.js'
 
 const playlists = ref([])
 const loading = ref(false)
 const errorMessage = ref('')
 
-async function loadPlaylists() {
+const sortedPlaylists = computed(() => {
+  return [...playlists.value].sort((a, b) => Number(b.likes || 0) - Number(a.likes || 0))
+})
+
+async function loadData() {
   loading.value = true
   errorMessage.value = ''
-
   try {
+    await getSongs()
     playlists.value = await getPlaylists()
   } catch (error) {
     console.error(error)
@@ -22,207 +28,57 @@ async function loadPlaylists() {
 }
 
 async function deletePlaylist(id) {
-  try {
-    await deletePlaylistApi(id)
-    await loadPlaylists()
-  } catch (error) {
-    console.error(error)
-    errorMessage.value = 'Playlist konnte nicht gelöscht werden.'
-  }
+  await deletePlaylistApi(id)
+  await loadData()
 }
 
-onMounted(() => {
-  loadPlaylists()
-})
+async function toggleLike(id) {
+  await likePlaylist(id)
+  playlists.value = await getPlaylists()
+}
+
+function playPlaylist(playlist) {
+  appStore.playPlaylist(playlist)
+}
+
+onMounted(loadData)
 </script>
 
 <template>
-  <div class="playlist-list">
-    <div class="header">
-      <h1>Alle Playlists</h1>
-      <RouterLink to="/playlists/create" class="btn-create">
-        + Neue Playlist
-      </RouterLink>
+  <main class="app-page">
+    <p class="page-kicker">Community</p>
+    <h1 class="page-heading">Playlists</h1>
+    <p class="page-lead">Dezent wie Spotify: Cover, Titel, Stimmung, Likes. Beliebte Playlists stehen weiter oben.</p>
+
+    <div class="page-actions">
+      <RouterLink to="/playlists/create" class="primary-pill">Playlist erstellen</RouterLink>
     </div>
 
-    <p v-if="loading" class="no-results">
-      Playlists werden geladen...
-    </p>
+    <p v-if="loading" class="empty-state">Playlists werden geladen...</p>
+    <p v-if="errorMessage" class="empty-state">{{ errorMessage }}</p>
 
-    <p v-if="errorMessage" class="no-results">
-      {{ errorMessage }}
-    </p>
-
-    <div v-if="!loading && playlists.length > 0" class="playlist-cards">
-      <div 
-        v-for="playlist in playlists" 
-        :key="playlist.id" 
-        class="playlist-card"
-      >
-        <div class="card-header">
-          <h2>{{ playlist.titel }}</h2>
-          <span class="badge">{{ playlist.stimmungsKategorie }}</span>
-        </div>
-
-        <p class="song-count">
-          {{ playlist.songs?.length || 0 }} Songs
-        </p>
-
-        <ul class="song-preview">
-          <li 
-            v-for="song in playlist.songs || []" 
-            :key="song.id"
-          >
-            {{ song.titel }} – {{ song.kuenstler }}
-          </li>
-        </ul>
-
-        <div class="card-actions">
-          <RouterLink 
-            :to="'/playlists/' + playlist.id + '/edit'" 
-            class="btn-edit"
-          >
-            Bearbeiten
-          </RouterLink>
-
-          <button 
-            @click="deletePlaylist(playlist.id)" 
-            class="btn-delete"
-          >
-            Löschen
-          </button>
-        </div>
+    <section v-if="!loading && sortedPlaylists.length" class="spotify-section">
+      <div class="spotify-grid">
+        <article v-for="playlist in sortedPlaylists" :key="playlist.id" class="spotify-card">
+          <div class="album-cover">▤</div>
+          <button type="button" class="card-play" @click="playPlaylist(playlist)">▶</button>
+          <h3>{{ playlist.titel }}</h3>
+          <p>{{ playlist.stimmungsKategorie }} · {{ playlist.songs?.length || playlist.songIds?.length || 0 }} Songs</p>
+          <div class="card-meta">
+            <span class="badge like-badge">{{ playlist.likes || 0 }} Likes</span>
+          </div>
+          <div class="card-actions">
+            <button type="button" class="ghost-pill" @click="toggleLike(playlist.id)">
+              {{ appStore.hasLikedPlaylist(playlist.id) ? 'Liked' : 'Like' }}
+            </button>
+            <button type="button" class="ghost-pill" @click="playPlaylist(playlist)">Abspielen</button>
+            <RouterLink :to="`/playlists/${playlist.id}/edit`" class="text-button">Bearbeiten</RouterLink>
+            <button v-if="appStore.isAdmin" type="button" class="text-button" @click="deletePlaylist(playlist.id)">Löschen</button>
+          </div>
+        </article>
       </div>
-    </div>
+    </section>
 
-    <p v-if="!loading && playlists.length === 0" class="no-results">
-      Noch keine Playlists erstellt.
-    </p>
-  </div>
+    <p v-if="!loading && !sortedPlaylists.length" class="empty-state">Noch keine Playlists vorhanden.</p>
+  </main>
 </template>
-
-<style scoped>
-.header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 24px;
-}
-
-h1 {
-  font-size: 28px;
-}
-
-.btn-create {
-  background: #9333EA;
-  color: white;
-  padding: 10px 24px;
-  border-radius: 100px;
-  text-decoration: none;
-  font-size: 14px;
-}
-
-.playlist-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 20px;
-}
-
-.playlist-card {
-  background: #140A28;
-  border: 1px solid rgba(147, 51, 234, 0.2);
-  border-radius: 16px;
-  padding: 24px;
-}
-
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-}
-
-.card-header h2 {
-  font-size: 18px;
-}
-
-.badge {
-  font-size: 12px;
-  padding: 4px 12px;
-  border-radius: 100px;
-  background: rgba(147, 51, 234, 0.15);
-  color: #C084FC;
-}
-
-.song-count {
-  font-size: 13px;
-  color: #9CA3AF;
-  margin-bottom: 12px;
-}
-
-.song-preview {
-  list-style: none;
-  margin-bottom: 20px;
-  padding: 0;
-}
-
-.song-preview li {
-  font-size: 13px;
-  color: #FFFFFF;
-  padding: 6px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.card-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.btn-edit {
-  color: #C084FC;
-  text-decoration: none;
-  font-size: 13px;
-  padding: 6px 12px;
-  border: 1px solid rgba(147, 51, 234, 0.3);
-  border-radius: 6px;
-}
-
-.btn-delete {
-  color: #F472B6;
-  background: transparent;
-  border: 1px solid rgba(236, 72, 153, 0.3);
-  border-radius: 6px;
-  padding: 6px 12px;
-  font-size: 13px;
-  cursor: pointer;
-}
-
-.no-results {
-  text-align: center;
-  color: #9CA3AF;
-  margin-top: 32px;
-  font-size: 14px;
-}
-
-@media (max-width: 768px) {
-  .header {
-    flex-direction: column;
-    gap: 16px;
-    align-items: flex-start;
-  }
-
-  .playlist-cards {
-    grid-template-columns: 1fr;
-  }
-
-  .card-actions {
-    flex-direction: column;
-  }
-
-  .btn-edit,
-  .btn-delete {
-    width: 100%;
-    text-align: center;
-  }
-}
-</style>
