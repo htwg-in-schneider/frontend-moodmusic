@@ -36,7 +36,7 @@ async function register() {
       <RouterLink to="/" class="public-brand"><span class="brand-dot">♪</span><span>MoodMusic</span></RouterLink>
       <div>
         <h1>Registrieren</h1>
-        <p>Erstelle deinen MoodMusic-Zugang. Der Account wird im Backend gespeichert.</p>
+        <p>Erstelle deinen Account und speichere Playlists, Likes und deinen Hörverlauf.</p>
       </div>
       <div v-if="errorMessage" class="empty-state">{{ errorMessage }}</div>
       <div class="form-row"><label>Name</label><input v-model="name" placeholder="Dein Name"></div>

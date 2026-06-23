@@ -35,7 +35,7 @@ async function login() {
       <RouterLink to="/" class="public-brand"><span class="brand-dot">♪</span><span>MoodMusic</span></RouterLink>
       <div>
         <h1>Login</h1>
-        <p>User: user@moodmusic.de · Admin: admin@moodmusic.de · Passwort: demo123</p>
+        <p>Willkommen zurück. Melde dich an und starte deine Musik passend zu deiner Stimmung.</p>
       </div>
       <div v-if="errorMessage" class="empty-state">{{ errorMessage }}</div>
       <div class="form-row"><label>E-Mail</label><input v-model="email" type="email"></div>

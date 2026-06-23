@@ -6,12 +6,13 @@ const routes = [
   { path: '/login', name: 'login', component: () => import('../views/public/LoginView.vue'), meta: { public: true } },
   { path: '/register', name: 'register', component: () => import('../views/public/RegisterView.vue'), meta: { public: true } },
   { path: '/forgot-password', name: 'forgot-password', component: () => import('../views/public/ForgotPasswordView.vue'), meta: { public: true } },
+  { path: '/reset-password', name: 'reset-password', component: () => import('../views/public/ResetPasswordView.vue'), meta: { public: true } },
   { path: '/impressum', name: 'impressum', component: () => import('../views/public/ImpressumView.vue'), meta: { public: true } },
   { path: '/datenschutz', name: 'datenschutz', component: () => import('../views/public/DatenschutzView.vue'), meta: { public: true } },
 
   { path: '/dashboard', name: 'dashboard', component: () => import('../views/user/DashboardView.vue'), meta: { requiresAuth: true } },
   { path: '/mood-check', name: 'mood-check', component: () => import('../views/user/MoodCheckView.vue'), meta: { requiresAuth: true } },
-  { path: '/recommendations', name: 'recommendations', component: () => import('../views/user/RecommendationsView.vue'), meta: { requiresAuth: true } },
+  { path: '/recommendations', redirect: to => ({ path: '/songs', query: to.query }) },
   { path: '/profile', name: 'profile', component: () => import('../views/user/ProfileView.vue'), meta: { requiresAuth: true } },
 
   { path: '/songs', name: 'songs', component: () => import('../views/SongList.vue'), meta: { requiresAuth: true } },
@@ -20,6 +21,7 @@ const routes = [
 
   { path: '/playlists', name: 'playlists', component: () => import('../views/PlaylistList.vue'), meta: { requiresAuth: true } },
   { path: '/playlists/create', name: 'playlist-create', component: () => import('../views/PlaylistCreate.vue'), meta: { requiresAuth: true } },
+  { path: '/playlists/:id', name: 'playlist-detail', component: () => import('../views/PlaylistDetail.vue'), meta: { requiresAuth: true } },
   { path: '/playlists/:id/edit', name: 'playlist-edit', component: () => import('../views/PlaylistEdit.vue'), meta: { requiresAuth: true } },
 
   { path: '/admin', name: 'admin', component: () => import('../views/admin/AdminDashboardView.vue'), meta: { requiresAuth: true, requiresAdmin: true } },

@@ -1,16 +1,24 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import { appStore } from './store.js'
+import { resolveImageUrl } from './services/api.js'
 
 const route = useRoute()
 const router = useRouter()
+const mobileMenuOpen = ref(false)
 
 const isPublicPage = computed(() => route.meta.public === true)
 const isAdmin = computed(() => appStore.isAdmin)
+const profileImage = computed(() => appStore.user?.profileImageUrl ? resolveImageUrl(appStore.user.profileImageUrl) : '')
+
+function closeMobileMenu() {
+  mobileMenuOpen.value = false
+}
 
 function logout() {
   appStore.logout()
+  closeMobileMenu()
   router.push('/')
 }
 </script>
@@ -27,7 +35,6 @@ function logout() {
 
       <nav class="side-nav">
         <RouterLink to="/dashboard">Home</RouterLink>
-        <RouterLink to="/recommendations">Empfehlungen</RouterLink>
         <RouterLink to="/playlists">Playlists</RouterLink>
         <RouterLink to="/songs">Songs</RouterLink>
         <RouterLink to="/profile">Profil</RouterLink>
@@ -41,8 +48,15 @@ function logout() {
 
     <section class="content-shell">
       <header class="top-actions">
+        <button type="button" class="mobile-menu-button" @click="mobileMenuOpen = true">
+          ☰
+        </button>
+
         <RouterLink to="/profile" class="profile-button">
-          <span>{{ appStore.initial }}</span>
+          <span class="profile-button-avatar">
+            <img v-if="profileImage" :src="profileImage" alt="Profilbild">
+            <template v-else>{{ appStore.initial }}</template>
+          </span>
           <b>Mein Profil</b>
         </RouterLink>
 
@@ -54,13 +68,38 @@ function logout() {
       <RouterView />
     </section>
 
-    <nav class="mobile-bottom-nav">
-      <RouterLink to="/dashboard">⌂<span>Home</span></RouterLink>
-      <RouterLink to="/recommendations">⌕<span>Suche</span></RouterLink>
-      <RouterLink to="/playlists">▤<span>Playlists</span></RouterLink>
-      <RouterLink to="/songs">♪<span>Songs</span></RouterLink>
-      <RouterLink to="/profile">●<span>Profil</span></RouterLink>
-    </nav>
+    <div v-if="mobileMenuOpen" class="mobile-drawer-backdrop" @click="closeMobileMenu"></div>
+
+    <aside class="mobile-drawer" :class="{ open: mobileMenuOpen }">
+      <div class="mobile-drawer-head">
+        <RouterLink to="/dashboard" class="side-brand" @click="closeMobileMenu">
+          <span class="brand-dot">♪</span>
+          <span>MoodMusic</span>
+        </RouterLink>
+        <button type="button" class="drawer-close" @click="closeMobileMenu">×</button>
+      </div>
+
+      <RouterLink to="/profile" class="drawer-profile" @click="closeMobileMenu">
+        <span class="drawer-avatar">
+          <img v-if="profileImage" :src="profileImage" alt="Profilbild">
+          <template v-else>{{ appStore.initial }}</template>
+        </span>
+        <span>
+          <strong>{{ appStore.displayName }}</strong>
+          <small>{{ appStore.user?.email }}</small>
+        </span>
+      </RouterLink>
+
+      <nav class="drawer-nav">
+        <RouterLink to="/dashboard" @click="closeMobileMenu">Home</RouterLink>
+        <RouterLink to="/playlists" @click="closeMobileMenu">Playlists</RouterLink>
+        <RouterLink to="/songs" @click="closeMobileMenu">Songs</RouterLink>
+        <RouterLink to="/profile" @click="closeMobileMenu">Profil</RouterLink>
+        <RouterLink v-if="isAdmin" to="/admin" @click="closeMobileMenu">Admin</RouterLink>
+      </nav>
+
+      <button type="button" class="drawer-logout" @click="logout">Logout</button>
+    </aside>
 
     <section v-if="appStore.currentSong && appStore.miniPlayerVisible" class="mini-player">
       <div class="mini-cover">♪</div>

@@ -1,94 +1,67 @@
 import { appStore } from '../store.js'
-import { request } from './api.js'
+import { request, API_BASE, authHeaders } from './api.js'
 
-function withSongs(playlist) {
-  const songs = playlist.songs?.length ? playlist.songs : appStore.getSongsForPlaylist(playlist)
-  return { ...playlist, songs, songIds: playlist.songIds || songs.map(song => song.id) }
+function buildPlaylistFormData(playlist) {
+  const formData = new FormData()
+  formData.append('titel', playlist.titel || '')
+  formData.append('stimmungsKategorie', playlist.stimmungsKategorie || '')
+  formData.append('description', playlist.description || '')
+  formData.append('songIds', (playlist.songIds || []).join(','))
+  if (playlist.coverFile) formData.append('cover', playlist.coverFile)
+  return formData
 }
 
-export async function getPlaylists() {
-  try {
-    const data = await request('/api/playlists')
-    if (Array.isArray(data)) {
-      const playlists = data.map(item => ({ ...item, likes: item.likes ?? 0 }))
-      appStore.setPlaylists(playlists)
-      return playlists
-    }
-  } catch (error) {
-    console.warn('Backend nicht erreichbar, nutze lokale Playlists.', error)
+async function fetchMultipart(path, method, playlist) {
+  const response = await fetch(`${API_BASE}${path}`, {
+    method,
+    headers: authHeaders(),
+    body: buildPlaylistFormData(playlist)
+  })
+  if (!response.ok) {
+    let message = 'Playlist konnte nicht gespeichert werden.'
+    try { message = (await response.json()).message || message } catch {}
+    throw new Error(message)
   }
+  return response.json()
+}
 
-  return [...appStore.playlists]
-    .map(withSongs)
-    .sort((a, b) => Number(b.likes || 0) - Number(a.likes || 0))
+export async function getPlaylists(tab = '', options = {}) {
+  const params = new URLSearchParams()
+  if (tab) params.set('tab', tab)
+  if (options.q) params.set('q', options.q)
+  if (options.mood) params.set('mood', options.mood)
+
+  const path = `/api/playlists${params.toString() ? `?${params.toString()}` : ''}`
+  const data = await request(path)
+  const playlists = Array.isArray(data) ? data.map(item => ({ ...item, likes: item.likes ?? 0 })) : []
+  if (!tab) appStore.setPlaylists(playlists)
+  return playlists
 }
 
 export async function getPlaylist(id) {
-  try {
-    return await request(`/api/playlists/${id}`)
-  } catch {
-    const playlist = appStore.playlists.find(item => Number(item.id) === Number(id))
-    return playlist ? withSongs(playlist) : null
-  }
+  return request(`/api/playlists/${id}`)
 }
 
 export async function createPlaylist(playlist) {
-  try {
-    const created = await request('/api/playlists', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...playlist, owner: appStore.displayName })
-    })
-    await getPlaylists()
-    return created
-  } catch (error) {
-    console.warn('Backend nicht erreichbar, speichere Playlist lokal.', error)
-    const newPlaylist = { ...playlist, id: Date.now(), likes: Number(playlist.likes || 0), owner: appStore.displayName }
-    appStore.playlists.push(newPlaylist)
-    appStore.savePlaylists()
-    return newPlaylist
-  }
+  const created = await fetchMultipart('/api/playlists', 'POST', playlist)
+  await getPlaylists()
+  return created
 }
 
 export async function updatePlaylist(id, playlist) {
-  try {
-    const updated = await request(`/api/playlists/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(playlist)
-    })
-    await getPlaylists()
-    return updated
-  } catch (error) {
-    console.warn('Backend nicht erreichbar, aktualisiere Playlist lokal.', error)
-    const index = appStore.playlists.findIndex(item => Number(item.id) === Number(id))
-    if (index !== -1) appStore.playlists[index] = { ...appStore.playlists[index], ...playlist, id: Number(id) }
-    appStore.savePlaylists()
-    return appStore.playlists[index]
-  }
+  const updated = await fetchMultipart(`/api/playlists/${id}`, 'PUT', playlist)
+  await getPlaylists()
+  return updated
 }
 
 export async function likePlaylist(id) {
-  try {
-    const updated = await request(`/api/playlists/${id}/like`, { method: 'POST' })
-    const index = appStore.playlists.findIndex(item => Number(item.id) === Number(id))
-    if (index !== -1) appStore.playlists[index] = updated
-    appStore.markPlaylistLiked(id)
-    appStore.savePlaylists()
-    return updated
-  } catch (error) {
-    console.warn('Backend nicht erreichbar, like lokal.', error)
-    appStore.togglePlaylistLikeLocal(id)
-  }
+  const updated = await request(`/api/playlists/${id}/like`, { method: 'POST' })
+  const index = appStore.playlists.findIndex(item => Number(item.id) === Number(id))
+  if (index !== -1) appStore.playlists[index] = updated
+  return updated
 }
 
 export async function deletePlaylist(id) {
-  try {
-    await request(`/api/playlists/${id}`, { method: 'DELETE' })
-    await getPlaylists()
-  } catch (error) {
-    console.warn('Backend nicht erreichbar, lösche Playlist lokal.', error)
-    appStore.playlists = appStore.playlists.filter(item => Number(item.id) !== Number(id))
-    appStore.savePlaylists()
-  }
+  await request(`/api/playlists/${id}`, { method: 'DELETE' })
+  await getPlaylists()
 }

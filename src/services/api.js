@@ -14,17 +14,19 @@ export function authHeaders(extra = {}) {
   const user = getAuthUser()
   return {
     ...extra,
-    ...(user?.id ? { 'X-USER-ID': String(user.id) } : {}),
-    ...(user?.role ? { 'X-USER-ROLE': user.role } : {})
+    ...(user?.authToken ? { 'X-AUTH-TOKEN': user.authToken } : {})
   }
 }
 
-export function resolveAudioUrl(url) {
+export function resolveMediaUrl(url) {
   if (!url) return ''
   if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('blob:')) return url
   if (url.startsWith('/')) return `${API_BASE}${url}`
   return `${API_BASE}/${url}`
 }
+
+export const resolveAudioUrl = resolveMediaUrl
+export const resolveImageUrl = resolveMediaUrl
 
 export async function request(path, options = {}) {
   const response = await fetch(`${API_BASE}${path}`, {
