@@ -170,7 +170,7 @@ h1 {
 .form-group label {
   display: block;
   font-size: 13px;
-  color: #C084FC;
+  color: #c084fd;
   margin-bottom: 8px;
   letter-spacing: 1px;
 }
