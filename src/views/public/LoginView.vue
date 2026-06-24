@@ -41,9 +41,8 @@ async function login() {
       <div class="form-row"><label>E-Mail</label><input v-model="email" type="email"></div>
       <div class="form-row"><label>Passwort</label><input v-model="password" type="password"></div>
       <button class="primary-pill" type="submit" :disabled="loading">{{ loading ? 'Lädt...' : 'Anmelden' }}</button>
-      <div class="auth-links">
+      <div class="auth-links auth-links-single">
         <RouterLink to="/register">Registrieren</RouterLink>
-        <RouterLink to="/forgot-password">Passwort vergessen?</RouterLink>
       </div>
     </form>
   </main>

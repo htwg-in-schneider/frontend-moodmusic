@@ -110,6 +110,9 @@ function logout() {
       </div>
 
       <div class="mini-controls">
+        <button type="button" aria-label="10 Sekunden zurück" title="10 Sekunden zurück" @click="appStore.seekBy(-10)">
+          ↶
+        </button>
         <button type="button" aria-label="Vorheriger Song" title="Vorheriger Song" @click="appStore.previousSong()">
           ⏮
         </button>
@@ -119,12 +122,31 @@ function logout() {
         <button type="button" aria-label="Nächster Song" title="Nächster Song" @click="appStore.nextSong()">
           ⏭
         </button>
+        <button type="button" aria-label="10 Sekunden vor" title="10 Sekunden vor" @click="appStore.seekBy(10)">
+          ↷
+        </button>
         <button type="button" aria-label="Zufällige Wiedergabe" title="Shuffle" :class="{ active: appStore.shuffle }" @click="appStore.toggleShuffle()">
           🔀
         </button>
         <button type="button" class="control-close" aria-label="Player schließen" title="Schließen" @click="appStore.closeMiniPlayer()">
           ✕
         </button>
+      </div>
+
+      <div class="mini-progress">
+        <span>{{ appStore.formatTime(appStore.currentTime) }}</span>
+        <input
+          type="range"
+          min="0"
+          :max="appStore.duration || 0"
+          step="0.1"
+          :value="appStore.currentTime"
+          :disabled="!appStore.duration"
+          :style="{ '--progress': appStore.progressPercent + '%' }"
+          aria-label="Songposition"
+          @input="appStore.seekTo(Number($event.target.value))"
+        >
+        <span>{{ appStore.formatTime(appStore.duration) }}</span>
       </div>
     </section>
   </div>

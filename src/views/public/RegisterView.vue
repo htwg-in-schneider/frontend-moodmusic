@@ -6,7 +6,6 @@ import { appStore } from '../../store.js'
 const router = useRouter()
 const name = ref('')
 const email = ref('')
-const address = ref('')
 const password = ref('')
 const errorMessage = ref('')
 const loading = ref(false)
@@ -20,7 +19,7 @@ async function register() {
   loading.value = true
   errorMessage.value = ''
   try {
-    await appStore.register({ name: name.value, email: email.value, address: address.value, password: password.value })
+    await appStore.register({ name: name.value, email: email.value, password: password.value })
     router.push('/dashboard')
   } catch (error) {
     errorMessage.value = error.message || 'Registrierung fehlgeschlagen.'
@@ -41,7 +40,6 @@ async function register() {
       <div v-if="errorMessage" class="empty-state">{{ errorMessage }}</div>
       <div class="form-row"><label>Name</label><input v-model="name" placeholder="Dein Name"></div>
       <div class="form-row"><label>E-Mail</label><input v-model="email" type="email" placeholder="deine@mail.de"></div>
-      <div class="form-row"><label>Adresse</label><input v-model="address" placeholder="Straße, Ort"></div>
       <div class="form-row"><label>Passwort</label><input v-model="password" type="password"></div>
       <button class="primary-pill" type="submit" :disabled="loading">{{ loading ? 'Speichert...' : 'Konto erstellen' }}</button>
       <div class="auth-links"><RouterLink to="/login">Schon registriert?</RouterLink></div>

@@ -57,7 +57,7 @@ watch(search, loadData)
   <main class="app-page">
     <p class="page-kicker">Deine Sammlung</p>
     <h1 class="page-heading">Playlists</h1>
-    <p class="page-lead">Hier findest du nur Playlists, die du selbst erstellt oder bewusst gelikt hast.</p>
+   
 
     <section class="filter-panel playlist-library-panel">
       <input v-model="search" placeholder="Playlist nach Titel suchen...">

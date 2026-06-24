@@ -5,8 +5,7 @@ import { changePassword, uploadProfileImage, deleteProfileImage } from '../../se
 import { resolveImageUrl } from '../../services/api.js'
 
 const profile = reactive({
-  name: appStore.user?.name || '',
-  address: appStore.user?.address || ''
+  name: appStore.user?.name || ''
 })
 
 const passwords = reactive({
@@ -123,7 +122,6 @@ async function savePassword() {
         </div>
 
         <div class="form-row"><label>Name</label><input v-model="profile.name" placeholder="Dein Name"></div>
-        <div class="form-row"><label>Adresse</label><input v-model="profile.address" placeholder="Straße, Ort"></div>
         <button class="primary-pill" type="submit" :disabled="savingProfile">{{ savingProfile ? 'Speichert...' : 'Profil speichern' }}</button>
         <p v-if="profileMessage" class="form-success">{{ profileMessage }}</p>
       </form>

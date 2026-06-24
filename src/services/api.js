@@ -1,4 +1,4 @@
-const RAW_API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080'
+const RAW_API_BASE = import.meta.env.VITE_API_URL || 'https://backend-moodmusic.onrender.com'
 
 export const API_BASE = RAW_API_BASE.replace(/\/$/, '')
 
@@ -14,7 +14,9 @@ export function authHeaders(extra = {}) {
   const user = getAuthUser()
   return {
     ...extra,
-    ...(user?.authToken ? { 'X-AUTH-TOKEN': user.authToken } : {})
+    ...(user?.token ? { Authorization: `Bearer ${user.token}` } : {}),
+    ...(user?.id ? { 'X-USER-ID': String(user.id) } : {}),
+    ...(user?.role ? { 'X-USER-ROLE': user.role } : {})
   }
 }
 

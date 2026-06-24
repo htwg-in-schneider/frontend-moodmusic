@@ -5,10 +5,28 @@ import { moods } from '../../store.js'
 
 const router = useRouter()
 const selectedMood = ref('')
+const contactName = ref('')
+const contactEmail = ref('')
+const contactMessage = ref('')
+const contactHint = ref('')
 
 function start() {
   if (!selectedMood.value) return
   router.push({ path: '/songs', query: { mood: selectedMood.value } })
+}
+
+function sendContact() {
+  if (!contactName.value || !contactEmail.value || !contactMessage.value) {
+    contactHint.value = 'Bitte Name, E-Mail und Nachricht ausfüllen.'
+    return
+  }
+
+  const subject = encodeURIComponent('Kontaktanfrage MoodMusic')
+  const body = encodeURIComponent(
+    `Name: ${contactName.value}\nE-Mail: ${contactEmail.value}\n\nNachricht:\n${contactMessage.value}`
+  )
+  window.location.href = `mailto:rogerschlude12345@gmail.com?subject=${subject}&body=${body}`
+  contactHint.value = 'Dein E-Mail-Programm wurde geöffnet. Dort musst du die Nachricht noch absenden.'
 }
 </script>
 
@@ -119,11 +137,12 @@ function start() {
         <h2>Fragen zu MoodMusic?</h2>
       </div>
 
-      <form class="glass-box contact-card form-grid" action="mailto:rogerschlude12345@gmail.com" method="post" enctype="text/plain">
-        <div class="form-row"><label>Name</label><input name="name" placeholder="Dein Name"></div>
-        <div class="form-row"><label>E-Mail</label><input name="email" type="email" placeholder="deine@mail.de"></div>
-        <div class="form-row"><label>Nachricht</label><textarea name="message" placeholder="Deine Nachricht"></textarea></div>
+      <form class="glass-box contact-card form-grid" @submit.prevent="sendContact">
+        <div class="form-row"><label>Name</label><input v-model="contactName" name="name" placeholder="Dein Name"></div>
+        <div class="form-row"><label>E-Mail</label><input v-model="contactEmail" name="email" type="email" placeholder="deine@mail.de"></div>
+        <div class="form-row"><label>Nachricht</label><textarea v-model="contactMessage" name="message" placeholder="Deine Nachricht"></textarea></div>
         <button type="submit" class="primary-pill">Nachricht senden →</button>
+        <p v-if="contactHint" class="form-help">{{ contactHint }}</p>
       </form>
     </section>
 

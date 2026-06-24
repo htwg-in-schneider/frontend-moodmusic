@@ -83,7 +83,7 @@ onMounted(loadHistory)
 
     <section class="glass-box mood-start-box">
       <span class="label">Welche Tätigkeit steht an?</span>
-      <p class="mood-helper">Wähle erst eine Stimmung oder Aktivität aus. Anfangs ist bewusst nichts ausgewählt.</p>
+      <p class="mood-helper">Wähle erst eine Stimmung oder Aktivität aus.</p>
 
       <div class="mood-grid">
         <button v-for="mood in moods" :key="mood" type="button" class="mood-chip" :class="{ active: selectedMood === mood }" @click="selectedMood = mood">

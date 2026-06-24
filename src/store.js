@@ -25,7 +25,7 @@ function normalizeRole(role) {
 }
 
 function normalizeUser(user) {
-  if (!user || !user.authToken) return null
+  if (!user) return null
   return {
     ...user,
     role: normalizeRole(user.role),
@@ -50,6 +50,9 @@ export const appStore = reactive({
   isPlaying: false,
   shuffle: false,
   miniPlayerVisible: false,
+  currentTime: 0,
+  duration: 0,
+  isSeeking: false,
 
   get isAuthenticated() {
     return !!this.user
@@ -65,6 +68,18 @@ export const appStore = reactive({
 
   get initial() {
     return this.displayName.charAt(0).toUpperCase()
+  },
+
+  get progressPercent() {
+    if (!this.duration || this.duration <= 0) return 0
+    return Math.min(100, Math.max(0, (this.currentTime / this.duration) * 100))
+  },
+
+  formatTime(seconds) {
+    const value = Number.isFinite(seconds) ? Math.max(0, Math.floor(seconds)) : 0
+    const minutes = Math.floor(value / 60)
+    const rest = value % 60
+    return `${minutes}:${String(rest).padStart(2, '0')}`
   },
 
   async login(email, password) {
@@ -105,6 +120,8 @@ export const appStore = reactive({
     this.queueIndex = 0
     this.isPlaying = false
     this.miniPlayerVisible = false
+    this.currentTime = 0
+    this.duration = 0
     localStorage.removeItem('moodmusic_user')
   },
 
@@ -234,6 +251,18 @@ export const appStore = reactive({
     this.shuffle = !this.shuffle
   },
 
+  seekTo(seconds) {
+    if (!audio || !Number.isFinite(seconds)) return
+    const target = Math.min(Math.max(seconds, 0), this.duration || seconds)
+    audio.currentTime = target
+    this.currentTime = target
+  },
+
+  seekBy(seconds) {
+    if (!audio) return
+    this.seekTo((audio.currentTime || 0) + seconds)
+  },
+
   closeMiniPlayer() {
     if (audio) {
       audio.pause()
@@ -245,7 +274,31 @@ export const appStore = reactive({
     this.queueIndex = 0
     this.isPlaying = false
     this.miniPlayerVisible = false
+    this.currentTime = 0
+    this.duration = 0
   }
 })
 
-if (audio) audio.addEventListener('ended', () => appStore.nextSong())
+if (audio) {
+  audio.addEventListener('loadedmetadata', () => {
+    appStore.duration = Number.isFinite(audio.duration) ? audio.duration : 0
+  })
+
+  audio.addEventListener('durationchange', () => {
+    appStore.duration = Number.isFinite(audio.duration) ? audio.duration : 0
+  })
+
+  audio.addEventListener('timeupdate', () => {
+    appStore.currentTime = Number.isFinite(audio.currentTime) ? audio.currentTime : 0
+  })
+
+  audio.addEventListener('play', () => {
+    appStore.isPlaying = true
+  })
+
+  audio.addEventListener('pause', () => {
+    appStore.isPlaying = false
+  })
+
+  audio.addEventListener('ended', () => appStore.nextSong())
+}
