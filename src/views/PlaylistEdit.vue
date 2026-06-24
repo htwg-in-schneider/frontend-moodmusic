@@ -141,3 +141,161 @@ async function save() {
     </form>
   </main>
 </template>
+
+<style scoped>
+.playlist-form {
+  max-width: 500px;
+}
+
+h1 {
+  font-size: 28px;
+  margin-bottom: 32px;
+}
+
+.error-message {
+  color: #F472B6;
+  margin-bottom: 20px;
+  font-size: 14px;
+}
+
+.info-message {
+  color: #9CA3AF;
+  margin-bottom: 20px;
+  font-size: 14px;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 13px;
+  color: #c084fd;
+  margin-bottom: 8px;
+  letter-spacing: 1px;
+}
+
+.form-group input,
+.form-group select {
+  width: 100%;
+  padding: 12px 16px;
+  background: #140A28;
+  border: 1px solid rgba(147, 51, 234, 0.3);
+  border-radius: 8px;
+  color: #FFFFFF;
+  font-size: 14px;
+  outline: none;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+  border-color: #9333EA;
+}
+
+.form-group select option {
+  background: #140A28;
+  color: #FFFFFF;
+}
+
+.song-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.song-option {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: #140A28;
+  border: 1px solid rgba(147, 51, 234, 0.2);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.song-option:hover {
+  border-color: rgba(147, 51, 234, 0.5);
+}
+
+.song-option.selected {
+  border-color: #9333EA;
+  background: rgba(147, 51, 234, 0.1);
+}
+
+.song-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.song-titel {
+  font-size: 14px;
+  color: #FFFFFF;
+}
+
+.song-kuenstler {
+  font-size: 12px;
+  color: #9CA3AF;
+}
+
+.check {
+  font-size: 18px;
+  color: #9333EA;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(147, 51, 234, 0.1);
+}
+
+.song-option.selected .check {
+  background: #9333EA;
+  color: white;
+}
+
+.form-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 32px;
+}
+
+.btn-save {
+  background: #9333EA;
+  color: white;
+  border: none;
+  padding: 12px 32px;
+  border-radius: 100px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.btn-save:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-cancel {
+  background: transparent;
+  color: #9CA3AF;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 12px 32px;
+  border-radius: 100px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+@media (max-width: 768px) {
+  .form-actions {
+    flex-direction: column;
+  }
+
+  .btn-save,
+  .btn-cancel {
+    width: 100%;
+  }
+}
+</style>
