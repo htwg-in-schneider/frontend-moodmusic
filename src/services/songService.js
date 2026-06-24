@@ -1,69 +1,78 @@
-const API_URL = 'http://localhost:8080/api/songs'
+import { appStore } from '../store.js'
+import { request, API_BASE, authHeaders } from './api.js'
 
-export async function getSongs(suche = '', genre = '', emotion = '') {
-  const params = new URLSearchParams()
+function localFilter(suche = '', mood = '') {
+  const q = String(suche || '').toLowerCase()
+  return appStore.songs.filter(song => {
+    const matchesSearch = !q || `${song.titel} ${song.kuenstler}`.toLowerCase().includes(q)
+    const matchesMood = !mood || song.emotionsKategorie === mood
+    return matchesSearch && matchesMood
+  })
+}
 
-  if (suche) params.append('suche', suche)
-  if (genre) params.append('genre', genre)
-  if (emotion) params.append('emotion', emotion)
+function buildSongFormData(song) {
+  const formData = new FormData()
+  formData.append('titel', song.titel || '')
+  formData.append('kuenstler', song.kuenstler || '')
+  formData.append('stimmungsKategorie', song.emotionsKategorie || song.stimmungsKategorie || '')
+  if (song.file) formData.append('file', song.file)
+  return formData
+}
 
-  const response = await fetch(`${API_URL}?${params.toString()}`)
+async function fetchMultipart(path, method, song) {
+  const response = await fetch(`${API_BASE}${path}`, {
+    method,
+    headers: authHeaders(),
+    body: buildSongFormData(song)
+  })
 
   if (!response.ok) {
-    throw new Error('Songs konnten nicht geladen werden')
+    let message = 'Song konnte nicht gespeichert werden.'
+    try { message = (await response.json()).message || message } catch {}
+    throw new Error(message)
+  }
+  return response.json()
+}
+
+export async function getSongs(suche = '', mood = '') {
+  const params = new URLSearchParams()
+  if (suche) params.append('suche', suche)
+  if (mood) params.append('mood', mood)
+
+  try {
+    const data = await request(`/api/songs?${params.toString()}`)
+    if (Array.isArray(data)) {
+      if (!suche && !mood) appStore.setSongs(data)
+      return data
+    }
+  } catch (error) {
+    console.warn('Backend nicht erreichbar, nutze lokale Songs.', error)
   }
 
-  return await response.json()
+  return localFilter(suche, mood)
 }
 
 export async function getSong(id) {
-  const response = await fetch(`${API_URL}/${id}`)
-
-  if (!response.ok) {
-    throw new Error('Song konnte nicht geladen werden')
+  try {
+    return await request(`/api/songs/${id}`)
+  } catch {
+    return appStore.songs.find(song => Number(song.id) === Number(id))
   }
-
-  return await response.json()
 }
 
 export async function createSong(song) {
-  const response = await fetch(API_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(song)
-  })
-
-  if (!response.ok) {
-    throw new Error('Song konnte nicht erstellt werden')
-  }
-
-  return await response.json()
+  const created = await fetchMultipart('/api/songs', 'POST', song)
+  await getSongs()
+  return created
 }
 
 export async function updateSong(id, song) {
-  const response = await fetch(`${API_URL}/${id}`, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(song)
-  })
-
-  if (!response.ok) {
-    throw new Error('Song konnte nicht aktualisiert werden')
-  }
-
-  return await response.json()
+  const updated = await fetchMultipart(`/api/songs/${id}`, 'PUT', song)
+  await getSongs()
+  return updated
 }
 
 export async function deleteSong(id) {
-  const response = await fetch(`${API_URL}/${id}`, {
-    method: 'DELETE'
-  })
-
-  if (!response.ok) {
-    throw new Error('Song konnte nicht gelöscht werden')
-  }
+  await request(`/api/songs/${id}`, { method: 'DELETE' })
+  await getSongs()
 }

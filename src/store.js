@@ -1,77 +1,304 @@
 import { reactive } from 'vue'
+import { loginUser, registerUser, updateMe } from './services/authService.js'
+import { resolveAudioUrl } from './services/api.js'
+import { recordListen } from './services/historyService.js'
 
-export const songStore = reactive({
-  songs: [
-    { id: 1, titel: 'Blinding Lights', kuenstler: 'The Weeknd', genre: 'Pop', bpm: 171, emotionsKategorie: 'Energiegeladen', dateiName: 'blinding_lights.mp3' },
-    { id: 2, titel: 'Clair de Lune', kuenstler: 'Debussy', genre: 'Klassik', bpm: 72, emotionsKategorie: 'Entspannt', dateiName: 'clair_de_lune.mp3' },
-    { id: 3, titel: 'Lose Yourself', kuenstler: 'Eminem', genre: 'Hip-Hop', bpm: 171, emotionsKategorie: 'Fokus', dateiName: 'lose_yourself.mp3' },
-    { id: 4, titel: 'Someone Like You', kuenstler: 'Adele', genre: 'Pop', bpm: 67, emotionsKategorie: 'Traurig', dateiName: 'someone_like_you.mp3' },
-    { id: 5, titel: 'Levels', kuenstler: 'Avicii', genre: 'Electronic', bpm: 126, emotionsKategorie: 'Glücklich', dateiName: 'levels.mp3' },
-  ],
-  nextSongId: 6,
+export const moods = ['Fokus', 'Entspannen', 'Glücklich', 'Traurig', 'Workout', 'Wütend']
 
-  playlists: [
-    { id: 1, titel: 'Workout Energy', stimmungsKategorie: 'Energiegeladen', songIds: [1, 3, 5] },
-    { id: 2, titel: 'Chill Vibes', stimmungsKategorie: 'Entspannt', songIds: [2, 4] },
-  ],
-  nextPlaylistId: 3,
-
-  // Song Methoden
-  addSong(song) {
-    this.songs.push({ ...song, id: this.nextSongId++ })
-  },
-  deleteSong(id) {
-    this.songs = this.songs.filter(s => s.id !== id)
-    this.playlists.forEach(p => {
-      p.songIds = p.songIds.filter(sid => sid !== id)
-    })
-  },
-  getSong(id) {
-    return this.songs.find(s => s.id === Number(id))
-  },
-  updateSong(id, updatedSong) {
-    const index = this.songs.findIndex(s => s.id === Number(id))
-    if (index !== -1) {
-      this.songs[index] = { ...this.songs[index], ...updatedSong }
-    }
-  },
-
-  // Playlist Methoden
-addPlaylist(playlist) {
-  this.playlists.push({
-    ...playlist,
-    id: this.nextPlaylistId++,
-    songIds: [...playlist.songIds]
-  })
-},
-
-deletePlaylist(id) {
-  this.playlists = this.playlists.filter(p => p.id !== Number(id))
-},
-
-getPlaylist(id) {
-  return this.playlists.find(p => p.id === Number(id))
-},
-
-updatePlaylist(id, updatedPlaylist) {
-  const index = this.playlists.findIndex(p => p.id === Number(id))
-
-  if (index !== -1) {
-    this.playlists[index] = {
-      ...this.playlists[index],
-      ...updatedPlaylist,
-      songIds: [...updatedPlaylist.songIds]
-    }
+function readJson(key, fallback) {
+  try {
+    const value = localStorage.getItem(key)
+    return value ? JSON.parse(value) : fallback
+  } catch {
+    return fallback
   }
-},
-
-getSongsForPlaylist(playlistId) {
-  const playlist = this.getPlaylist(playlistId)
-
-  if (!playlist || !Array.isArray(playlist.songIds)) {
-    return []
-  }
-
-  return this.songs.filter(song => playlist.songIds.includes(song.id))
 }
+
+function writeJson(key, value) {
+  localStorage.setItem(key, JSON.stringify(value))
+}
+
+const audio = typeof Audio !== 'undefined' ? new Audio() : null
+
+function normalizeRole(role) {
+  return String(role || 'USER').toUpperCase()
+}
+
+function normalizeUser(user) {
+  if (!user) return null
+  return {
+    ...user,
+    role: normalizeRole(user.role),
+    address: user.address ?? user.adresse ?? ''
+  }
+}
+
+function uniqueById(items) {
+  return items.filter((item, index, array) => array.findIndex(other => Number(other.id) === Number(item.id)) === index)
+}
+
+export const appStore = reactive({
+  user: normalizeUser(readJson('moodmusic_user', null)),
+  songs: [],
+  playlists: [],
+  moodHistory: readJson('moodmusic_mood_history', []),
+  dailyHistory: [],
+  currentMood: localStorage.getItem('moodmusic_current_mood') || '',
+  currentSong: null,
+  queue: [],
+  queueIndex: 0,
+  isPlaying: false,
+  shuffle: false,
+  miniPlayerVisible: false,
+  currentTime: 0,
+  duration: 0,
+  isSeeking: false,
+
+  get isAuthenticated() {
+    return !!this.user
+  },
+
+  get isAdmin() {
+    return this.user?.role === 'ADMIN'
+  },
+
+  get displayName() {
+    return this.user?.name || 'Demo User'
+  },
+
+  get initial() {
+    return this.displayName.charAt(0).toUpperCase()
+  },
+
+  get progressPercent() {
+    if (!this.duration || this.duration <= 0) return 0
+    return Math.min(100, Math.max(0, (this.currentTime / this.duration) * 100))
+  },
+
+  formatTime(seconds) {
+    const value = Number.isFinite(seconds) ? Math.max(0, Math.floor(seconds)) : 0
+    const minutes = Math.floor(value / 60)
+    const rest = value % 60
+    return `${minutes}:${String(rest).padStart(2, '0')}`
+  },
+
+  async login(email, password) {
+    const user = normalizeUser(await loginUser(email, password))
+    this.user = user
+    writeJson('moodmusic_user', user)
+    return user
+  },
+
+  async register(payload) {
+    const user = normalizeUser(await registerUser(payload))
+    this.user = user
+    writeJson('moodmusic_user', user)
+    return user
+  },
+
+  async updateProfile(payload) {
+    if (!this.user?.id) return
+    const user = normalizeUser(await updateMe(this.user.id, { ...this.user, ...payload }))
+    this.user = user
+    writeJson('moodmusic_user', user)
+  },
+
+  setUser(user) {
+    this.user = normalizeUser(user)
+    writeJson('moodmusic_user', this.user)
+  },
+
+  logout() {
+    if (audio) {
+      audio.pause()
+      audio.currentTime = 0
+      audio.src = ''
+    }
+    this.user = null
+    this.currentSong = null
+    this.queue = []
+    this.queueIndex = 0
+    this.isPlaying = false
+    this.miniPlayerVisible = false
+    this.currentTime = 0
+    this.duration = 0
+    localStorage.removeItem('moodmusic_user')
+  },
+
+  setSongs(songs) {
+    this.songs = Array.isArray(songs) ? songs : []
+  },
+
+  setPlaylists(playlists) {
+    this.playlists = Array.isArray(playlists) ? playlists : []
+  },
+
+  setCurrentMood(mood) {
+    this.currentMood = mood || ''
+    localStorage.setItem('moodmusic_current_mood', this.currentMood)
+  },
+
+  addMoodHistory(mood) {
+    if (!mood) return
+    this.moodHistory.unshift({ id: Date.now(), mood, createdAt: new Date().toISOString() })
+    this.moodHistory = this.moodHistory.slice(0, 20)
+    writeJson('moodmusic_mood_history', this.moodHistory)
+  },
+
+  setDailyHistory(history) {
+    this.dailyHistory = Array.isArray(history) ? history : []
+  },
+
+  getSongsByMood(mood) {
+    const value = String(mood || '').toLowerCase()
+    if (!value) return []
+    return this.songs.filter(song => String(song.emotionsKategorie || '').toLowerCase() === value)
+  },
+
+  getSongsForPlaylist(playlist) {
+    if (Array.isArray(playlist?.songs) && playlist.songs.length) return playlist.songs
+    const ids = playlist?.songIds || []
+    return this.songs.filter(song => ids.map(Number).includes(Number(song.id)))
+  },
+
+  hasLikedPlaylist(playlistId) {
+    const playlist = this.playlists.find(item => Number(item.id) === Number(playlistId))
+    return !!playlist?.likedByCurrentUser
+  },
+
+  async logListen(song) {
+    if (!song?.id || !this.user?.id) return
+    try {
+      await recordListen(song.id, this.currentMood || song.emotionsKategorie || '')
+    } catch (error) {
+      console.warn('Hörverlauf konnte nicht gespeichert werden.', error)
+    }
+  },
+
+  startAudio() {
+    if (!audio || !this.currentSong) return
+    const src = resolveAudioUrl(this.currentSong.audioUrl)
+    if (!src) {
+      this.isPlaying = false
+      console.warn('Kein audioUrl für Song:', this.currentSong)
+      return
+    }
+
+    if (audio.src !== src) audio.src = src
+    audio.play()
+      .then(() => {
+        this.isPlaying = true
+        this.logListen(this.currentSong)
+      })
+      .catch(error => {
+        console.warn('Audio konnte nicht abgespielt werden:', error)
+        this.isPlaying = false
+      })
+  },
+
+  playSong(song, queue = null, mood = '') {
+    if (mood) this.setCurrentMood(mood)
+    const cleanQueue = uniqueById(queue && queue.length ? queue : [song])
+    this.queue = cleanQueue
+    this.queueIndex = cleanQueue.findIndex(item => Number(item.id) === Number(song.id))
+    if (this.queueIndex < 0) this.queueIndex = 0
+    this.currentSong = cleanQueue[this.queueIndex] || song
+    this.miniPlayerVisible = true
+    this.startAudio()
+  },
+
+  playPlaylist(playlist, mood = '') {
+    if (mood) this.setCurrentMood(mood)
+    const playlistSongs = this.getSongsForPlaylist(playlist)
+    if (!playlistSongs.length) return
+    this.queue = playlistSongs
+    this.queueIndex = 0
+    this.currentSong = playlistSongs[0]
+    this.miniPlayerVisible = true
+    this.startAudio()
+  },
+
+  togglePlay() {
+    if (!audio) return
+    if (!this.currentSong && this.songs.length) {
+      this.playSong(this.songs[0], this.songs)
+      return
+    }
+    if (this.isPlaying) {
+      audio.pause()
+      this.isPlaying = false
+    } else {
+      this.startAudio()
+    }
+  },
+
+  nextSong() {
+    if (!this.queue.length) return
+    if (this.shuffle) this.queueIndex = Math.floor(Math.random() * this.queue.length)
+    else this.queueIndex = (this.queueIndex + 1) % this.queue.length
+    this.currentSong = this.queue[this.queueIndex]
+    this.startAudio()
+  },
+
+  previousSong() {
+    if (!this.queue.length) return
+    this.queueIndex = (this.queueIndex - 1 + this.queue.length) % this.queue.length
+    this.currentSong = this.queue[this.queueIndex]
+    this.startAudio()
+  },
+
+  toggleShuffle() {
+    this.shuffle = !this.shuffle
+  },
+
+  seekTo(seconds) {
+    if (!audio || !Number.isFinite(seconds)) return
+    const target = Math.min(Math.max(seconds, 0), this.duration || seconds)
+    audio.currentTime = target
+    this.currentTime = target
+  },
+
+  seekBy(seconds) {
+    if (!audio) return
+    this.seekTo((audio.currentTime || 0) + seconds)
+  },
+
+  closeMiniPlayer() {
+    if (audio) {
+      audio.pause()
+      audio.currentTime = 0
+      audio.src = ''
+    }
+    this.currentSong = null
+    this.queue = []
+    this.queueIndex = 0
+    this.isPlaying = false
+    this.miniPlayerVisible = false
+    this.currentTime = 0
+    this.duration = 0
+  }
 })
+
+if (audio) {
+  audio.addEventListener('loadedmetadata', () => {
+    appStore.duration = Number.isFinite(audio.duration) ? audio.duration : 0
+  })
+
+  audio.addEventListener('durationchange', () => {
+    appStore.duration = Number.isFinite(audio.duration) ? audio.duration : 0
+  })
+
+  audio.addEventListener('timeupdate', () => {
+    appStore.currentTime = Number.isFinite(audio.currentTime) ? audio.currentTime : 0
+  })
+
+  audio.addEventListener('play', () => {
+    appStore.isPlaying = true
+  })
+
+  audio.addEventListener('pause', () => {
+    appStore.isPlaying = false
+  })
+
+  audio.addEventListener('ended', () => appStore.nextSong())
+}
