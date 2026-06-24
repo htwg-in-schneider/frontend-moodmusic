@@ -7,34 +7,67 @@ import { getPlaylists, likePlaylist } from '../services/playlistService.js'
 import { resolveImageUrl } from '../services/api.js'
 
 const route = useRoute()
+
 const suche = ref('')
 const playlistSearch = ref('')
 const mood = ref(String(route.query.mood || ''))
+
 const songs = ref([])
 const playlists = ref([])
+
 const loading = ref(false)
 const errorMessage = ref('')
 const openFilter = ref(false)
+
 const showAllSongs = ref(false)
 const showAllPlaylists = ref(false)
 
-const filteredSongs = computed(() => songs.value)
+const filteredSongs = computed(() => {
+  const q = String(suche.value || '').trim().toLowerCase()
+  const selectedMood = String(mood.value || '').trim().toLowerCase()
 
-const visibleSongs = computed(() => showAllSongs.value ? filteredSongs.value : filteredSongs.value.slice(0, 10))
+  return songs.value.filter(song => {
+    const title = String(song.titel || '').toLowerCase()
+    const artist = String(song.kuenstler || '').toLowerCase()
+    const songMood = String(song.emotionsKategorie || '').trim().toLowerCase()
+
+    const matchesSearch = !q || title.includes(q) || artist.includes(q)
+    const matchesMood = !selectedMood || songMood === selectedMood
+
+    return matchesSearch && matchesMood
+  })
+})
+
+const visibleSongs = computed(() =>
+  showAllSongs.value ? filteredSongs.value : filteredSongs.value.slice(0, 10)
+)
+
 const hasMoreSongs = computed(() => filteredSongs.value.length > 10)
 
 const matchingPlaylists = computed(() => {
-  const selectedMood = String(mood.value || '')
-  const q = playlistSearch.value.trim().toLowerCase()
+  const selectedMood = String(mood.value || '').trim().toLowerCase()
+  const q = String(playlistSearch.value || '').trim().toLowerCase()
+
   return playlists.value
     .filter(playlist => playlist.creatorId)
-    .filter(playlist => !selectedMood || playlist.stimmungsKategorie === selectedMood)
-    .filter(playlist => Array.isArray(playlist.songs) && playlist.songs.length > 0)
-    .filter(playlist => !q || String(playlist.titel || '').toLowerCase().includes(q) || String(playlist.creatorName || '').toLowerCase().includes(q))
+    .filter(playlist => {
+      const playlistMood = String(playlist.stimmungsKategorie || '').trim().toLowerCase()
+      const title = String(playlist.titel || '').toLowerCase()
+      const creator = String(playlist.creatorName || '').toLowerCase()
+
+      const matchesMood = !selectedMood || playlistMood === selectedMood
+      const matchesSearch = !q || title.includes(q) || creator.includes(q)
+      const hasSongs = Array.isArray(playlist.songs) && playlist.songs.length > 0
+
+      return matchesMood && matchesSearch && hasSongs
+    })
     .sort((a, b) => (b.likes || 0) - (a.likes || 0))
 })
 
-const visiblePlaylists = computed(() => showAllPlaylists.value ? matchingPlaylists.value : matchingPlaylists.value.slice(0, 10))
+const visiblePlaylists = computed(() =>
+  showAllPlaylists.value ? matchingPlaylists.value : matchingPlaylists.value.slice(0, 10)
+)
+
 const hasMorePlaylists = computed(() => matchingPlaylists.value.length > 10)
 
 function setMood(value) {
@@ -47,11 +80,13 @@ function setMood(value) {
 async function loadSongsAndPlaylists() {
   loading.value = true
   errorMessage.value = ''
+
   try {
     const [songData, playlistData] = await Promise.all([
-      getSongs(suche.value, mood.value),
+      getSongs('', mood.value),
       getPlaylists('', { mood: mood.value })
     ])
+
     songs.value = songData
     playlists.value = playlistData
   } catch (error) {
@@ -81,14 +116,21 @@ function playPlaylist(playlist) {
 }
 
 onMounted(loadSongsAndPlaylists)
-watch([suche, mood], () => {
+
+watch(mood, () => {
   showAllSongs.value = false
   showAllPlaylists.value = false
   loadSongsAndPlaylists()
 })
+
+watch(suche, () => {
+  showAllSongs.value = false
+})
+
 watch(playlistSearch, () => {
   showAllPlaylists.value = false
 })
+
 watch(() => route.query.mood, (value) => {
   mood.value = String(value || '')
 })
@@ -98,7 +140,9 @@ watch(() => route.query.mood, (value) => {
   <main class="app-page">
     <p class="page-kicker">Musik finden</p>
     <h1 class="page-heading">Songs</h1>
-    <p class="page-lead">Wähle eine Stimmung und starte direkt passende Musik. Darunter findest du passende Playlists nach Likes sortiert.</p>
+    <p class="page-lead">
+      Wähle eine Stimmung und starte direkt passende Musik. Darunter findest du passende Playlists nach Likes sortiert.
+    </p>
 
     <section class="filter-panel filter-panel-songs filter-panel-mood-only song-search-panel">
       <input v-model="suche" placeholder="Titel oder Künstler suchen...">
@@ -109,22 +153,44 @@ watch(() => route.query.mood, (value) => {
           <span>{{ mood || 'Alle Stimmungen' }}</span>
           <span class="custom-select-arrow">⌄</span>
         </button>
+
         <div v-if="openFilter" class="custom-select-menu">
-          <button type="button" class="custom-select-option" :class="{ selected: mood === '' }" @click="setMood('')">Alle Stimmungen</button>
-          <button v-for="item in moods" :key="item" type="button" class="custom-select-option" :class="{ selected: mood === item }" @click="setMood(item)">
+          <button
+            type="button"
+            class="custom-select-option"
+            :class="{ selected: mood === '' }"
+            @click="setMood('')"
+          >
+            Alle Stimmungen
+          </button>
+
+          <button
+            v-for="item in moods"
+            :key="item"
+            type="button"
+            class="custom-select-option"
+            :class="{ selected: mood === item }"
+            @click="setMood(item)"
+          >
             {{ item }}
           </button>
         </div>
       </div>
 
-      <RouterLink v-if="appStore.isAdmin" to="/songs/create" class="primary-pill">Neuer Song</RouterLink>
+      <RouterLink v-if="appStore.isAdmin" to="/songs/create" class="primary-pill">
+        Neuer Song
+      </RouterLink>
     </section>
 
     <p v-if="loading" class="empty-state">Musik wird geladen...</p>
     <p v-if="errorMessage" class="empty-state">{{ errorMessage }}</p>
 
     <section v-if="!loading && filteredSongs.length" class="list-card">
-      <div v-for="song in visibleSongs" :key="song.id" class="song-row song-row-simple song-row-mood-only">
+      <div
+        v-for="song in visibleSongs"
+        :key="song.id"
+        class="song-row song-row-simple song-row-mood-only"
+      >
         <button type="button" class="icon-btn" @click="playSong(song)">▶</button>
 
         <div class="song-title">
@@ -135,14 +201,32 @@ watch(() => route.query.mood, (value) => {
         <small class="hide-mobile">{{ song.emotionsKategorie || 'Keine Stimmung' }}</small>
 
         <div class="song-actions">
-          <RouterLink v-if="appStore.isAdmin" :to="`/songs/${song.id}/edit`" class="icon-btn">✎</RouterLink>
-          <button v-if="appStore.isAdmin" type="button" class="icon-btn" @click="deleteSong(song.id)">×</button>
+          <RouterLink
+            v-if="appStore.isAdmin"
+            :to="`/songs/${song.id}/edit`"
+            class="icon-btn"
+          >
+            ✎
+          </RouterLink>
+
+          <button
+            v-if="appStore.isAdmin"
+            type="button"
+            class="icon-btn"
+            @click="deleteSong(song.id)"
+          >
+            ×
+          </button>
         </div>
       </div>
     </section>
 
     <div v-if="!loading && hasMoreSongs" class="show-more-row">
-      <button type="button" class="ghost-pill show-more-button" @click="showAllSongs = !showAllSongs">
+      <button
+        type="button"
+        class="ghost-pill show-more-button"
+        @click="showAllSongs = !showAllSongs"
+      >
         {{ showAllSongs ? 'Weniger Songs anzeigen' : `⋯ ${filteredSongs.length - 10} weitere Songs anzeigen` }}
       </button>
     </div>
@@ -155,23 +239,38 @@ watch(() => route.query.mood, (value) => {
       <div class="section-title-row">
         <div>
           <h2>{{ mood ? `Playlists für ${mood}` : 'Beliebte Playlists' }}</h2>
-          
         </div>
       </div>
 
       <div class="spotify-grid">
-        <article v-for="playlist in visiblePlaylists" :key="playlist.id" class="spotify-card">
+        <article
+          v-for="playlist in visiblePlaylists"
+          :key="playlist.id"
+          class="spotify-card"
+        >
           <RouterLink :to="`/playlists/${playlist.id}`" class="playlist-card-link">
             <div class="album-cover playlist-cover">
-              <img v-if="playlist.coverImageUrl" :src="resolveImageUrl(playlist.coverImageUrl)" alt="Playlist Cover">
+              <img
+                v-if="playlist.coverImageUrl"
+                :src="resolveImageUrl(playlist.coverImageUrl)"
+                alt="Playlist Cover"
+              >
               <span v-else>▤</span>
             </div>
+
             <h3>{{ playlist.titel }}</h3>
             <p>{{ playlist.stimmungsKategorie }}</p>
+
             <div class="playlist-creator-mini">
               <span class="creator-avatar creator-avatar-small">
-                <img v-if="playlist.creatorImageUrl" :src="resolveImageUrl(playlist.creatorImageUrl)" alt="Profilbild">
-                <template v-else>{{ (playlist.creatorName || 'U').charAt(0).toUpperCase() }}</template>
+                <img
+                  v-if="playlist.creatorImageUrl"
+                  :src="resolveImageUrl(playlist.creatorImageUrl)"
+                  alt="Profilbild"
+                >
+                <template v-else>
+                  {{ (playlist.creatorName || 'U').charAt(0).toUpperCase() }}
+                </template>
               </span>
               <small>von {{ playlist.creatorName || 'Unbekannt' }}</small>
             </div>
@@ -188,14 +287,24 @@ watch(() => route.query.mood, (value) => {
             <button type="button" class="ghost-pill" @click="toggleLike(playlist.id)">
               {{ playlist.likedByCurrentUser ? 'Gespeichert' : 'Speichern' }}
             </button>
-            <button type="button" class="ghost-pill" @click="playPlaylist(playlist)">Abspielen</button>
-            <RouterLink :to="`/playlists/${playlist.id}`" class="text-button">Öffnen</RouterLink>
+
+            <button type="button" class="ghost-pill" @click="playPlaylist(playlist)">
+              Abspielen
+            </button>
+
+            <RouterLink :to="`/playlists/${playlist.id}`" class="text-button">
+              Öffnen
+            </RouterLink>
           </div>
         </article>
       </div>
 
       <div v-if="hasMorePlaylists" class="show-more-row">
-        <button type="button" class="ghost-pill show-more-button" @click="showAllPlaylists = !showAllPlaylists">
+        <button
+          type="button"
+          class="ghost-pill show-more-button"
+          @click="showAllPlaylists = !showAllPlaylists"
+        >
           {{ showAllPlaylists ? 'Weniger Playlists anzeigen' : `⋯ ${matchingPlaylists.length - 10} weitere Playlists anzeigen` }}
         </button>
       </div>
